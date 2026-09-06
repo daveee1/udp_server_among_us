@@ -8,12 +8,59 @@
 #include <netinet/in.h>
 #include "headers/utils.h"
 #include <sys/select.h>
+#include <pthread.h>
    
 #define PORT    8080
 #define MAXLINE 1024
+#define MAX_NUMBER_OF_CLIENTS 5
    
+typedef struct
+{
+    int port;
+    int active;
+    int position;
+    int socket;
+    pthread_t thread_id;
+}Client;
+Client clients[MAX_NUMBER_OF_CLIENTS];
 
-void handleClient(void *arg){
+//MUTEXES
+pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t roomAvb = PTHREAD_COND_INITIALIZER;
+
+
+static int find_free_pos_in_clients(){
+    for (int i = 0; i < MAX_NUMBER_OF_CLIENTS; i++){
+        if(clients[i].active == 0){
+            pthread_mutex_unlock(&clients_mutex);
+            return i;
+        }
+    }
+    return -1;
+}
+
+static int addclient(Client *c){
+    int free_pos = find_free_pos_in_clients();
+    while(free_pos == -1){
+        pthread_cond_wait(&roomAvb, &clients_mutex);
+        free_pos = find_free_pos_in_clients();
+    }
+    pthread_mutex_lock(&clients_mutex);
+
+    Client *new = &clients[free_pos];
+    new->active = 1;
+    new->port = c->port;
+    new->position = free_pos;
+    new->socket = c->socket;
+
+    if(pthread_create))
+
+    pthread_mutex_unlock(&clients_mutex);
+    return 1;
+}
+
+
+static void handleClient(void *arg){
 
 }
 
@@ -47,7 +94,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
        
-    socklen_t len; // Change type from int to socklen_t
+    socklen_t len;
     ssize_t n;
     len = sizeof(cliaddr);  //len is value
 
@@ -70,13 +117,16 @@ int main() {
 
         // a client wants to connect!
         if(FD_ISSET(server_fd, &read_fds)){
-            // TODO
+            // TODO addclient to my server
+            Client c;
+            c.port = 
+            addclient();
         }
 
         
     }
     // MSG_WAITALL to rcv the whole response
-    n = recvfrom(sockfd, (char *)buffer, MAXLINE, 
+    n = recvfrom(server_fd, (char *)buffer, MAXLINE, 
                 MSG_WAITALL, ( struct sockaddr *) &cliaddr,
                 &len);
     buffer[n] = '\0';
@@ -86,7 +136,7 @@ int main() {
 
     // MSG_CONFIRM to state not control every time the 'mac of the ip' address: 
     // trust this and keep going dont check
-    sendto(sockfd, (const char *)hello, strlen(hello), 
+    sendto(server_fd, (const char *)hello, strlen(hello), 
         MSG_CONFIRM, (const struct sockaddr *) &cliaddr,
             len);
     printf("Hello message sent.\n"); 
