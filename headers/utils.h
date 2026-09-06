@@ -43,7 +43,6 @@ void print_client_unlocked(const char *format, ...);
 
 void print_analysis(const char *format, ...);
 
-int receive(int sd, char *retBuf, int size);
 
 extern int verbose;
 extern pthread_mutex_t log_mutex;

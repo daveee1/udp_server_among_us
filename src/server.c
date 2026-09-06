@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include "headers/utils.h"
+#include <sys/select.h>
    
 #define PORT    8080
 #define MAXLINE 1024
@@ -18,13 +19,13 @@ void handleClient(void *arg){
 
 // Driver code
 int main() {
-    int sockfd;
+    int server_fd;
     char buffer[MAXLINE];
     char *hello = "Hello from server";
     struct sockaddr_in servaddr, cliaddr;
        
     // Creating socket file descriptor
-    if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+    if ( (server_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
         perror("socket creation failed");
         exit(EXIT_FAILURE);
     }
@@ -39,7 +40,7 @@ int main() {
        
     // Bind the socket with the server address 
     // (associate the server to the following port)
-    if ( bind(sockfd, (const struct sockaddr *)&servaddr, 
+    if ( bind(server_fd, (const struct sockaddr *)&servaddr, 
             sizeof(servaddr)) < 0 )
     {
         perror("bind failed");
@@ -49,6 +50,32 @@ int main() {
     socklen_t len; // Change type from int to socklen_t
     ssize_t n;
     len = sizeof(cliaddr);  //len is value
+
+    while(1){
+        fd_set read_fds;
+        FD_ZERO(&read_fds);
+        FD_SET(server_fd, &read_fds); // to check if a client wants to connect
+        
+        // each 5 seconds check if a client wants to connect to us
+        struct timeval timer;
+        timer.tv_sec = 5; 
+        timer.tv_usec = 0;
+
+
+        int select_activity = select(server_fd + 1, &read_fds, NULL, NULL, &timer);
+        if(select_activity < 0){
+            printf("SELECT error");
+            exit(1);
+        }
+
+        // a client wants to connect!
+        if(FD_ISSET(server_fd, &read_fds)){
+            // TODO
+        }
+
+        
+    }
+    // MSG_WAITALL to rcv the whole response
     n = recvfrom(sockfd, (char *)buffer, MAXLINE, 
                 MSG_WAITALL, ( struct sockaddr *) &cliaddr,
                 &len);
@@ -56,6 +83,9 @@ int main() {
 
     printf("Client : %s\n", buffer);
 
+
+    // MSG_CONFIRM to state not control every time the 'mac of the ip' address: 
+    // trust this and keep going dont check
     sendto(sockfd, (const char *)hello, strlen(hello), 
         MSG_CONFIRM, (const struct sockaddr *) &cliaddr,
             len);
