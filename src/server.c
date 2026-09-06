@@ -13,6 +13,7 @@
 #define PORT    8080
 #define MAXLINE 1024
 #define MAX_NUMBER_OF_CLIENTS 5
+#define MAP_SIZE 25
    
 typedef struct
 {
@@ -20,9 +21,14 @@ typedef struct
     int active;
     int position;
     int socket;
+    char *ip;
     pthread_t thread_id;
 }Client;
 Client clients[MAX_NUMBER_OF_CLIENTS];
+
+// map: matrix
+int matrix[MAP_SIZE][MAP_SIZE];
+
 
 //MUTEXES
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -39,7 +45,7 @@ static int find_free_pos_in_clients(){
     return -1;
 }
 
-static int addclient(Client *c){
+static int addclient(struct sockaddr_in *client_addr){
     int free_pos = find_free_pos_in_clients();
     while(free_pos == -1){
         pthread_cond_wait(&roomAvb, &clients_mutex);
@@ -49,20 +55,58 @@ static int addclient(Client *c){
 
     Client *new = &clients[free_pos];
     new->active = 1;
-    new->port = c->port;
+    new->port = client_addr->sin_port;
     new->position = free_pos;
-    new->socket = c->socket;
-
-    if(pthread_create))
+    new->ip = inet_ntoa(client_addr->sin_addr);
+    // new->socket = c->socket;
 
     pthread_mutex_unlock(&clients_mutex);
     return 1;
 }
 
+static int find_client(struct sockaddr_in *client_addr){
+    int port = ntohs(client_addr->sin_port);
+    char *ip_str = inet_ntoa(client_addr->sin_addr);
 
-static void handleClient(void *arg){
+    for(int i=0; i < MAX_NUMBER_OF_CLIENTS; i++){
+        Client *curr_client;
+        if(curr_client->active == 1 && curr_client->port == port && !strcmp(ip_str, curr_client->ip)){
+            return 1;
+        }
+    }
+    return -1;
+}
+
+static void handle_packet(int server_fd){
+    char buffer[10];
+    struct sockaddr_in cli_addr;
+    socklen_t addr_len = sizeof(cli_addr);
+
+    ssize_t bytes = recvfrom(server_fd, buffer, sizeof(buffer) - 1, 0,
+                             (struct sockaddr *)&cli_addr, &addr_len);
+    if (bytes <= 0) return;
+
+    buffer[bytes] = '\0';
+
+    // 1. Identify or register the client
+    int player_idx = find_client(&cli_addr);
+    if (player_idx == -1) {
+        player_idx = addclient(&cli_addr);
+        if (player_idx == -1) {
+            printf("Server is full, dropping packet.\n");
+            return;
+        }
+    }
+    
+    // manage the packet TODO
+
 
 }
+
+static void init_clients(){
+    pthread_mutex_lock();
+}
+
 
 // Driver code
 int main() {
@@ -98,6 +142,8 @@ int main() {
     ssize_t n;
     len = sizeof(cliaddr);  //len is value
 
+
+
     while(1){
         fd_set read_fds;
         FD_ZERO(&read_fds);
@@ -115,12 +161,10 @@ int main() {
             exit(1);
         }
 
-        // a client wants to connect!
+        // a client sent a packet!
         if(FD_ISSET(server_fd, &read_fds)){
             // TODO addclient to my server
-            Client c;
-            c.port = 
-            addclient();
+            handle_packet(server_fd);
         }
 
         
